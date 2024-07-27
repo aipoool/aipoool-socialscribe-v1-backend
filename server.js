@@ -13,8 +13,6 @@ import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import rateLimit from "express-rate-limit";
 
-// const stripe = Stripe(process.env.STRIPE_API_KEY);
-// const endptSecret = process.env.WEBHOOK_SIGNING_SECRET;
 
 await connectionToDB();
 
@@ -34,7 +32,6 @@ app.use(
   })
 );
 
-// app.use("/stripe-webhook", express.raw({ type: "application/json" }));
 
 // Middleware
 app.use(express.json());
@@ -43,7 +40,7 @@ app.set("trust proxy", 1);
 app.use(
   session({
     secret: process.env.SECRET_SESSION,
-    resave: true, //we dont want to save a session if nothing is modified
+    resave: false, //we dont want to save a session if nothing is modified
     saveUninitialized: false, //dont create a session until something is stored
     store: new MongoStore({
       mongoUrl: process.env.DATABASE,
@@ -54,6 +51,7 @@ app.use(
       secure: "auto",
       sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
     },
+    cookie: { secure: false }
   })
 );
 
@@ -89,16 +87,6 @@ app.use(function (req, res, next) {
   next();
 });
 
-// setup session
-/**
- * This session is used to encrypt the user data
- * Similar to jwt token services
- **/
-// app.use(session({
-//     secret: process.env.SECRET_SESSION,
-//     resave: false,
-//     saveUninitialized: true
-// }))
 
 // setup passport
 app.use(passport.initialize());
@@ -214,27 +202,6 @@ app.post("/auth/userdata", checkAuthenticated, async (req, res) => {
 });
 
 
-/**WILL BE REMOVING ONCE THE CHANGES ARE BEING MADE COMPLETELY */
-// app.post("/auth/enter-your-key/success", async (req, res) => {
-//   const { id, openAIKey } = req.body;
-//   console.log("Path is enter-your-key/success ", id, openAIKey);
-//   try {
-//     await userdb.findOneAndUpdate(
-//       { _id: id },
-//       {
-//         $set: {
-//           openAIKey: openAIKey,
-//         },
-//       },
-//       { new: true, useFindAndModify: false }
-//     );
-//     res.send({ message: "OpenAI Key updated successfully" });
-//   } catch (error) {
-//     console.error("Error updating OpenAI Key:", error);
-//     res.status(500).send({ message: "Error updating OpenAI Key" });
-//   }
-// });
-
 app.get("/auth/logout", async (req, res, next) => {
   req.logout(function (err) {
     if (err) {
@@ -261,6 +228,26 @@ app.post("/api/generate-response", checkAuthenticated, async (req, res) => {
   } catch (err) {
     console.log(err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/setUserStatus", async (req, res) => {
+  const { id, accessToken } = req.body;
+  console.log(req.body);
+
+  try {
+    if (accessToken) {
+      const updatedUser = await userdb.findOneAndUpdate(
+        { _id: id },
+        { $set: { isANewUser: false } },
+        { new: true, useFindAndModify: false }
+      );
+
+      res.send({ message: "User status updated successfully" });
+    }
+  } catch (error) {
+    console.error("Error updating Counter:", error);
+    res.status(500).send({ message: "Error updating Counter" });
   }
 });
 
