@@ -11,6 +11,10 @@ const userSchema = new mongoose.Schema({
     stripePriceId:String,
     stripeProductId:String,
     endDate:Number, 
+    isANewUser: {
+        type:Boolean, 
+        default:true
+    }, 
     subType: {
         type:String, 
         default: 'free',

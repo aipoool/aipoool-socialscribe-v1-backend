@@ -24,9 +24,3 @@ const connectionToDB = async () => {
 
 export default connectionToDB;
 
-// mongoose.connect(DB , {
-//     useUnifiedTopology: true,
-//     useNewUrlParser: true
-// }).then(()=> console.log("Database Connected")).catch(err => console.log("Error",err))
-
-// export default mongoose;
