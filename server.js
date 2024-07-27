@@ -17,26 +17,6 @@ import rateLimit from "express-rate-limit";
 await connectionToDB();
 
 const app = express();
-
-app.set("trust proxy", 1);
-app.use(
-  session({
-    secret: process.env.SECRET_SESSION,
-    resave: true, //we dont want to save a session if nothing is modified
-    saveUninitialized: true, //dont create a session until something is stored
-    store: new MongoStore({
-      mongoUrl: process.env.DATABASE,
-      collection: 'sessions'
-    }),
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-      secure: "auto",
-      sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
-    },
-  })
-);
-
-
 app.use(
   cors({
     origin: [
@@ -56,7 +36,19 @@ app.use(
 // Middleware
 app.use(express.json());
 
-
+app.set("trust proxy", 1);
+app.use(
+  session({
+    secret: process.env.SECRET_SESSION,
+    resave: true, //we dont want to save a session if nothing is modified
+    saveUninitialized: true, //dont create a session until something is stored
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      secure: "auto",
+      sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
+    },
+  })
+);
 
 
 if (process.env.NODE_ENV === "development") {
@@ -70,13 +62,17 @@ const limiter = rateLimit({
     "Too many requests from this IP, please try again after some time--..",
 });
 
-const checkAuthenticated = (req, res, next) => {
-  console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ error: "Not authenticated" });
-};
+// const checkAuthenticated = (req, res, next) => {
+//   console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
+//   if (req.isAuthenticated()) {
+//     return next();
+//   }
+//   res.status(401).json({ error: "Not authenticated" });
+// };
+
+function isLoggedIn(req, res, next) {
+  req.user ? next() : res.sendStatus(401); 
+}
 
 
 app.use(limiter);
@@ -190,7 +186,7 @@ app.get("/auth/login/success", async (req, res) => {
   // }
 });
 
-app.post("/auth/userdata", checkAuthenticated, async (req, res) => {
+app.post("/auth/userdata", isLoggedIn, async (req, res) => {
   const { id, accessToken } = req.body;
   try {
     if (accessToken) {
@@ -221,7 +217,7 @@ app.get("/api/test", (req, res) => {
 
 /**OPENAI API ROUTES */
 app.options("/api/generate-response", cors());
-app.post("/api/generate-response", checkAuthenticated, async (req, res) => {
+app.post("/api/generate-response", isLoggedIn, async (req, res) => {
   const { post, tone,  site } = req.body;
 
 
@@ -254,7 +250,7 @@ app.post("/api/setUserStatus", async (req, res) => {
   }
 });
 
-app.post("/api/setCounter", checkAuthenticated, async (req, res) => {
+app.post("/api/setCounter", isLoggedIn, async (req, res) => {
   const { id, count, accessToken } = req.body;
   console.log(req.body);
 
@@ -275,7 +271,7 @@ app.post("/api/setCounter", checkAuthenticated, async (req, res) => {
   }
 });
 
-app.post("/api/getCounter", checkAuthenticated, async (req, res) => {
+app.post("/api/getCounter", isLoggedIn, async (req, res) => {
   const { id, accessToken } = req.body;
   try {
     if (accessToken) {
