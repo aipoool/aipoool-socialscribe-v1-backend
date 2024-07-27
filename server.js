@@ -57,17 +57,6 @@ app.use(
   })
 );
 
-// app.use(
-//   session({
-//     secret: process.env.SECRET_SESSION,
-//     resave: true, //we dont want to save a session if nothing is modified
-//     saveUninitialized: true, //dont create a session until something is stored
-//     store: new MongoStore({
-//       mongoUrl: process.env.DATABASE,
-//       collection: 'sessions'
-//     })
-//   })
-// );
 
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
