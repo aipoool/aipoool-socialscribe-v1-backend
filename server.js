@@ -17,6 +17,26 @@ import rateLimit from "express-rate-limit";
 await connectionToDB();
 
 const app = express();
+
+app.set("trust proxy", 1);
+app.use(
+  session({
+    secret: process.env.SECRET_SESSION,
+    resave: true, //we dont want to save a session if nothing is modified
+    saveUninitialized: true, //dont create a session until something is stored
+    store: new MongoStore({
+      mongoUrl: process.env.DATABASE,
+      collection: 'sessions'
+    }),
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      secure: "auto",
+      sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
+    },
+  })
+);
+
+
 app.use(
   cors({
     origin: [
@@ -36,23 +56,7 @@ app.use(
 // Middleware
 app.use(express.json());
 
-app.set("trust proxy", 1);
-app.use(
-  session({
-    secret: process.env.SECRET_SESSION,
-    resave: true, //we dont want to save a session if nothing is modified
-    saveUninitialized: true, //dont create a session until something is stored
-    store: new MongoStore({
-      mongoUrl: process.env.DATABASE,
-      collection: 'sessions'
-    }),
-    cookie: {
-      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days
-      secure: "auto",
-      sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
-    },
-  })
-);
+
 
 
 if (process.env.NODE_ENV === "development") {
