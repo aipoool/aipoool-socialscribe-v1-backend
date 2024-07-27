@@ -47,9 +47,9 @@ app.use(
       collection: 'sessions'
     }),
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-      secure: process.env.NODE_ENV === "production", // Set secure cookies in production
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Cross-site cookie for production
+      maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days
+      secure: "auto",
+      sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
     },
   })
 );
