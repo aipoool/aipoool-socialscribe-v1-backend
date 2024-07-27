@@ -40,8 +40,8 @@ app.set("trust proxy", 1);
 app.use(
   session({
     secret: process.env.SECRET_SESSION,
-    resave: false, //we dont want to save a session if nothing is modified
-    saveUninitialized: false, //dont create a session until something is stored
+    resave: true, //we dont want to save a session if nothing is modified
+    saveUninitialized: true, //dont create a session until something is stored
     store: new MongoStore({
       mongoUrl: process.env.DATABASE,
       collection: 'sessions'
@@ -51,7 +51,6 @@ app.use(
       secure: "auto",
       sameSite: "none", //Enable when deployment OR when not using localhost, We're not on the same site, we're using different site so the cookie need to effectively transfer from Backend to Frontend
     },
-    cookie: { secure: false }
   })
 );
 
