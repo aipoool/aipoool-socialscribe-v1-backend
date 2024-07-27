@@ -171,7 +171,7 @@ app.get("/auth/test", (req, res) => {
 });
 
 
-// initial google oauth login
+// initial google oauth
 app.get(
   "/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
@@ -180,7 +180,7 @@ app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
     failureRedirect: "https://socialscribe-aipoool.onrender.com/login",
-    successRedirect: "https://socialscribe-aipoool.onrender.com/enter-your-key",
+    successRedirect: "https://socialscribe-aipoool.onrender.com/redirecting",
   })
 );
 
