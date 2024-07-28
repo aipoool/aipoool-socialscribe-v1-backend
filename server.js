@@ -67,13 +67,13 @@ const limiter = rateLimit({
     "Too many requests from this IP, please try again after some time--..",
 });
 
-const checkAuthenticated = (req, res, next) => {
-  console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ error: "Not authenticated" });
-};
+// const checkAuthenticated = (req, res, next) => {
+//   console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
+//   if (req.isAuthenticated()) {
+//     return next();
+//   }
+//   res.status(401).json({ error: "Not authenticated" });
+// };
 
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -186,7 +186,7 @@ app.get("/auth/login/success", async (req, res) => {
     accessToken : req.user.accessToken, 
     email : req.user.email,
   }, process.env.JWT_KEY, {
-    expiresIn: "1h", // Set token expiration as needed
+    expiresIn: "3 days", // Set token expiration as needed
   });
 
   console.log("The jwt token generated is : " , token); 
@@ -203,7 +203,7 @@ app.get("/auth/login/success", async (req, res) => {
 
 });
 
-app.post("/auth/userdata", checkAuthenticated, async (req, res) => {
+app.post("/auth/userdata", verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
   try {
     if (accessToken) {
@@ -234,7 +234,7 @@ app.get("/api/test", (req, res) => {
 
 /**OPENAI API ROUTES */
 app.options("/api/generate-response", cors());
-app.post("/api/generate-response", checkAuthenticated, async (req, res) => {
+app.post("/api/generate-response", verifyToken, async (req, res) => {
   const { post, tone,  site } = req.body;
 
 
@@ -247,7 +247,7 @@ app.post("/api/generate-response", checkAuthenticated, async (req, res) => {
   }
 });
 
-app.post("/api/setUserStatus", async (req, res) => {
+app.post("/api/setUserStatus", verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
   console.log(req.body);
 
@@ -267,7 +267,7 @@ app.post("/api/setUserStatus", async (req, res) => {
   }
 });
 
-app.post("/api/setCounter", checkAuthenticated, async (req, res) => {
+app.post("/api/setCounter", verifyToken, async (req, res) => {
   const { id, count, accessToken } = req.body;
   console.log(req.body);
 
