@@ -11,6 +11,7 @@ import userdb from "./model/userSchema.js";
 import connectionToDB from "./db/connection.js";
 import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
+import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 
 
@@ -66,13 +67,29 @@ const limiter = rateLimit({
     "Too many requests from this IP, please try again after some time--..",
 });
 
-const checkAuthenticated = (req, res, next) => {
-  console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
-  if (req.isAuthenticated()) {
-    return next();
+// const checkAuthenticated = (req, res, next) => {
+//   console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
+//   if (req.isAuthenticated()) {
+//     return next();
+//   }
+//   res.status(401).json({ error: "Not authenticated" });
+// };
+
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.sendStatus(401);
   }
-  res.status(401).json({ error: "Not authenticated" });
+
+  jwt.verify(token, process.env.JWT_KEY, (err, user) => {
+    if (err) {
+      return res.sendStatus(403);
+    }
+    req.user = user;
+    next();
+  });
 };
+
 
 
 app.use(limiter);
@@ -162,28 +179,25 @@ app.get(
 
 app.get("/auth/login/success", async (req, res) => {
   console.log("Request data from login/success : ", req.user);
+
+  const token = jwt.sign({ 
+    id: req.user._id, 
+    accessToken : req.user.accessToken, 
+    email : req.user.email,
+  }, process.env.JWT_KEY, {
+    expiresIn: "1h", // Set token expiration as needed
+  });
+
   if (req.user) {
-    res.status(200).json({ message: "User Login", user: req.user });
+    res.status(200).json({ 
+      message: "User Login", 
+      user: req.user,
+      jwtToken : token
+    });
   } else {
     res.status(403).json({ message: "User Not Authorized" });
   }
-  // if(req.user){
-  //     //console.log(req.user.accessToken)
-  //     console.log(req.user)
-  //     if(req.user.accessToken){
-  //         res.status(200).json({message: "User Login" , user:req.user});
-  //         console.log(req.user);
-  //         //const User = req.user;
-  //         // // setting the jwt token
-  //         // jwt.sign({User}, process.env.JWT_KEY, (err, token) => {
-  //         //     res.status(200);
-  //         //     res.send({User, auth: token});
-  //         // })
-  //     }
 
-  // }else {
-  //     res.status(400).json({message: "Not Authorized"});
-  // }
 });
 
 app.post("/auth/userdata", checkAuthenticated, async (req, res) => {
@@ -271,7 +285,7 @@ app.post("/api/setCounter", checkAuthenticated, async (req, res) => {
   }
 });
 
-app.post("/api/getCounter", checkAuthenticated, async (req, res) => {
+app.post("/api/getCounter", verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
   try {
     if (accessToken) {
