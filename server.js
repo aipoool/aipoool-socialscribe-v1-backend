@@ -67,13 +67,13 @@ const limiter = rateLimit({
     "Too many requests from this IP, please try again after some time--..",
 });
 
-// const checkAuthenticated = (req, res, next) => {
-//   console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
-//   if (req.isAuthenticated()) {
-//     return next();
-//   }
-//   res.status(401).json({ error: "Not authenticated" });
-// };
+const checkAuthenticated = (req, res, next) => {
+  console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.status(401).json({ error: "Not authenticated" });
+};
 
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
