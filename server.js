@@ -77,6 +77,7 @@ const checkAuthenticated = (req, res, next) => {
 
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
+  console.log("The token received at the middleware: ", token);
   if (!token) {
     return res.sendStatus(401);
   }
