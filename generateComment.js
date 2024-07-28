@@ -4,7 +4,7 @@ import axios from "axios";
 // // Define constants
 const CHATGPT_END_POINT = "https://api.openai.com/v1/chat/completions";
 const CHATGPT_MODEL = "gpt-3.5-turbo-0125";
-const openAIKey = process.env.OPENAI_KEY_3-5;
+const openAIKey = process.env.OPENAI_KEY_3;
 var prompt; 
 
 // Function to send a message to the ChatGPT API and return the response
