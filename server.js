@@ -248,19 +248,16 @@ app.post("/api/generate-response", verifyToken, async (req, res) => {
 });
 
 app.post("/api/setUserStatus", verifyToken, async (req, res) => {
-  const { id, accessToken } = req.body;
+  const { id } = req.body;
   console.log(req.body);
 
   try {
-    if (accessToken) {
       const updatedUser = await userdb.findOneAndUpdate(
         { _id: id },
         { $set: { isANewUser: false } },
         { new: true, useFindAndModify: false }
       );
-
       res.send({ message: "User status updated successfully" });
-    }
   } catch (error) {
     console.error("Error updating Counter:", error);
     res.status(500).send({ message: "Error updating Counter" });
