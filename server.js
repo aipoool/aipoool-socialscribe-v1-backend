@@ -267,6 +267,17 @@ app.post("/api/setUserStatus", verifyToken, async (req, res) => {
   }
 });
 
+app.post("/api/getUserRating", verifyToken, async (req, res) => {
+  const { id } = req.body;
+  try {
+      const response = await userdb.findById(id);
+      res.status(200).json({ rating: response.userRating });
+  } catch (error) {
+      res.status(500).send({ message: "Error retrieving user rating" });
+  }
+});
+
+
 app.post("/api/setCounter", verifyToken, async (req, res) => {
   const { id, count, accessToken } = req.body;
   console.log(req.body);

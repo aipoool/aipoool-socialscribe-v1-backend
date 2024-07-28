@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema({
         type:Boolean, 
         default:true
     }, 
+    userRating : {
+        type:Number, 
+        default:1
+    },
     subType: {
         type:String, 
         default: 'free',
