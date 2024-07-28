@@ -188,6 +188,8 @@ app.get("/auth/login/success", async (req, res) => {
     expiresIn: "1h", // Set token expiration as needed
   });
 
+  console.log("The jwt token generated is : " , token); 
+
   if (req.user) {
     res.status(200).json({ 
       message: "User Login", 
