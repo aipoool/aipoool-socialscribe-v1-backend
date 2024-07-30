@@ -1,8 +1,9 @@
 import redis from "redis";
+import { createClient } from "redis";
 
 const redisConnect = async () => {
 
-    const redisClient = await redis.createClient({
+    const redisClient = await createClient({
         url: process.env.REDIS_URL
     })
     .on('error', (err) => {

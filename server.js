@@ -14,10 +14,13 @@ import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
-
+let redisConnectionClient; 
 
 await connectionToDB();
-await redisConnect(); 
+(async()=> {
+  redisConnectionClient = await redisConnect(); 
+})(); 
+
 
 
 const app = express();
@@ -303,7 +306,7 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
     if (accessToken) {
       
       // trying to get the data from redis 
-      const userCountRedis = await redisConnect.get(cacheKey);
+      const userCountRedis = await redisConnectionClient.get(cacheKey);
       if (userCountRedis) {
         console.log("COUNTER GET from Redis :: : ", userCountRedis.buttonCounts);
         console.log("TOTAL COUNT from Redis :: : ", userCountRedis.totalCount);
@@ -319,7 +322,7 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
         console.log("TOTAL COUNT from db :: : ", response.totalCount);
 
         // set the data in redis 
-        await redisConnect.set(cacheKey, response); 
+        await redisConnectionClient.set(cacheKey, response); 
         console.log(`Data set in redis for key: ${cacheKey}`);
 
         res.status(200).json({
