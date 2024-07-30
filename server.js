@@ -9,14 +9,15 @@ import OAuth2Strategy from "passport-google-oauth20";
 import cors from "cors";
 import userdb from "./model/userSchema.js";
 import connectionToDB from "./db/connection.js";
+import redisConnect from "./db/redis.config.js";
 import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
-import redis from "redis";
 import rateLimit from "express-rate-limit";
 
 
 await connectionToDB();
+await redisConnect(); 
 
 
 const app = express();
@@ -38,20 +39,6 @@ app.use(
 
 // Middleware
 app.use(express.json());
-
-// Create Redis client
-const redisClient = redis.createClient(6379);
-
-// Handle Redis connection errors
-redisClient.on('error', (err) => {
-    console.error('Redis error:', err);
-});
-
-redisClient.on('connect', () => {
-  console.log('Connected to Redis');
-});
-
-await redisClient.connect();
 
 
 app.set("trust proxy", 1);
@@ -309,50 +296,45 @@ app.post("/api/setCounter", verifyToken, async (req, res) => {
 
 // redis version to get the counter 
 // API to get counter with Redis caching
-app.post('/api/getCounter', verifyToken, async (req, res) => {
+app.post("/api/getCounter", verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
   const cacheKey = `user:${id}:counter`;
-
   try {
-      if (accessToken) {
-          // Check Redis cache for data
-          redisClient.get(cacheKey, async (err, cachedData) => {
-              if (err) {
-                  console.error('Redis error:', err);
-                  return res.status(500).send({ message: 'Error getting Counter' });
-              }
+    if (accessToken) {
+      
+      // trying to get the data from redis 
+      const userCountRedis = await redisConnect.get(cacheKey);
+      if (userCountRedis) {
+        console.log("COUNTER GET from Redis :: : ", userCountRedis.buttonCounts);
+        console.log("TOTAL COUNT from Redis :: : ", userCountRedis.totalCount);
+        res.status(200).json({
+          count: userCountRedis.buttonCounts,
+          totalCount: userCountRedis.totalCount,
+        });
+      } 
+      else {
+        // if not , find in the db and set in redis 
+        const response = await userdb.findById(id);
+        console.log("COUNTER GET from db :: : ", response.buttonCounts);
+        console.log("TOTAL COUNT from db :: : ", response.totalCount);
 
-              if (cachedData) {
-                  // Return cached data
-                  const data = JSON.parse(cachedData);
-                  return res.status(200).json({
-                      count: data.buttonCounts,
-                      totalCount: data.totalCount,
-                  });
-              } else {
-                  // Fetch data from database
-                  const response = await userdb.findById(id);
-                  console.log('COUNTER GET :: : ', response.buttonCounts);
-                  console.log('TOTAL COUNT :: : ', response.totalCount);
+        // set the data in redis 
+        await redisConnect.set(cacheKey, response); 
+        console.log(`Data set in redis for key: ${cacheKey}`);
 
-                  // Cache the data in Redis for subsequent requests
-                  redisClient.setEx(cacheKey, 1440, JSON.stringify(response));
-
-                  // Return the data from the database
-                  return res.status(200).json({
-                      count: response.buttonCounts,
-                      totalCount: response.totalCount,
-                  });
-              }
-          });
-      } else {
-          res.status(400).send({ message: 'Access token is required' });
+        res.status(200).json({
+          count: response.buttonCounts,
+          totalCount: response.totalCount,
+        });
       }
+
+    }
   } catch (error) {
-      console.error('Error getting Counter:', error);
-      res.status(500).send({ message: 'Error getting Counter' });
+    console.error("Error getting Counter:", error);
+    res.status(500).send({ message: "Error getting Counter" });
   }
 });
+
 
 
 // app.post("/api/getCounter", verifyToken, async (req, res) => {
