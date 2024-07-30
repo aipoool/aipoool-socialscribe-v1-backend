@@ -18,13 +18,6 @@ import rateLimit from "express-rate-limit";
 
 await connectionToDB();
 
-// Create Redis client
-const redisClient = redis.createClient(6379);
-
-// Handle Redis connection errors
-redisClient.on('error', (err) => {
-    console.error('Redis error:', err);
-});
 
 const app = express();
 app.use(
@@ -45,6 +38,21 @@ app.use(
 
 // Middleware
 app.use(express.json());
+
+// Create Redis client
+const redisClient = redis.createClient(6379);
+
+// Handle Redis connection errors
+redisClient.on('error', (err) => {
+    console.error('Redis error:', err);
+});
+
+redisClient.on('connect', () => {
+  console.log('Connected to Redis');
+});
+
+await redisClient.connect();
+
 
 app.set("trust proxy", 1);
 app.use(
