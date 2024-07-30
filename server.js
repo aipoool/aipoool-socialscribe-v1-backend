@@ -12,10 +12,19 @@ import connectionToDB from "./db/connection.js";
 import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
+import redis from "redis";
 import rateLimit from "express-rate-limit";
 
 
 await connectionToDB();
+
+// Create Redis client
+const redisClient = redis.createClient(6379);
+
+// Handle Redis connection errors
+redisClient.on('error', (err) => {
+    console.error('Redis error:', err);
+});
 
 const app = express();
 app.use(
@@ -67,13 +76,7 @@ const limiter = rateLimit({
     "Too many requests from this IP, please try again after some time--..",
 });
 
-// const checkAuthenticated = (req, res, next) => {
-//   console.log("User is authenticated:", req.isAuthenticated()); // Debugging line
-//   if (req.isAuthenticated()) {
-//     return next();
-//   }
-//   res.status(401).json({ error: "Not authenticated" });
-// };
+
 
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -296,23 +299,71 @@ app.post("/api/setCounter", verifyToken, async (req, res) => {
   }
 });
 
-app.post("/api/getCounter", verifyToken, async (req, res) => {
+// redis version to get the counter 
+// API to get counter with Redis caching
+app.post('/api/getCounter', verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
+  const cacheKey = `user:${id}:counter`;
+
   try {
-    if (accessToken) {
-      const response = await userdb.findById(id);
-      console.log("COUNTER GET :: : ", response.buttonCounts);
-      console.log("TOTAL COUNT :: : ", response.totalCount);
-      res.status(200).json({
-        count: response.buttonCounts,
-        totalCount: response.totalCount,
-      });
-    }
+      if (accessToken) {
+          // Check Redis cache for data
+          redisClient.get(cacheKey, async (err, cachedData) => {
+              if (err) {
+                  console.error('Redis error:', err);
+                  return res.status(500).send({ message: 'Error getting Counter' });
+              }
+
+              if (cachedData) {
+                  // Return cached data
+                  const data = JSON.parse(cachedData);
+                  return res.status(200).json({
+                      count: data.buttonCounts,
+                      totalCount: data.totalCount,
+                  });
+              } else {
+                  // Fetch data from database
+                  const response = await userdb.findById(id);
+                  console.log('COUNTER GET :: : ', response.buttonCounts);
+                  console.log('TOTAL COUNT :: : ', response.totalCount);
+
+                  // Cache the data in Redis for subsequent requests
+                  redisClient.setEx(cacheKey, 1440, JSON.stringify(response));
+
+                  // Return the data from the database
+                  return res.status(200).json({
+                      count: response.buttonCounts,
+                      totalCount: response.totalCount,
+                  });
+              }
+          });
+      } else {
+          res.status(400).send({ message: 'Access token is required' });
+      }
   } catch (error) {
-    console.error("Error getting Counter:", error);
-    res.status(500).send({ message: "Error getting Counter" });
+      console.error('Error getting Counter:', error);
+      res.status(500).send({ message: 'Error getting Counter' });
   }
 });
+
+
+// app.post("/api/getCounter", verifyToken, async (req, res) => {
+//   const { id, accessToken } = req.body;
+//   try {
+//     if (accessToken) {
+//       const response = await userdb.findById(id);
+//       console.log("COUNTER GET :: : ", response.buttonCounts);
+//       console.log("TOTAL COUNT :: : ", response.totalCount);
+//       res.status(200).json({
+//         count: response.buttonCounts,
+//         totalCount: response.totalCount,
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Error getting Counter:", error);
+//     res.status(500).send({ message: "Error getting Counter" });
+//   }
+// });
 
 /**WILL BE REMOVING ONCE THE CHANGES ARE BEING MADE COMPLETELY */
 app.post("/api/check", async (req, res) => {
@@ -680,7 +731,7 @@ app.post("/api/check", async (req, res) => {
 //   res.status(200).end();
 // });
 
-// Testing routes here 
+// Testing routes
 app.get("/test", (req, res) => {
   res.json({ Hi: "This is a... testing message" });
 });
