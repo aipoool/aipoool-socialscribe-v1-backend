@@ -308,11 +308,12 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
       // trying to get the data from redis 
       const userCountRedis = await redisConnectionClient.get(cacheKey);
       if (userCountRedis) {
-        console.log("COUNTER GET from Redis :: : ", userCountRedis.buttonCounts);
-        console.log("TOTAL COUNT from Redis :: : ", userCountRedis.totalCount);
+        const parsedData = JSON.parse(userCountRedis);
+        console.log("COUNTER GET from Redis :: : ", parsedData.buttonCounts);
+        console.log("TOTAL COUNT from Redis :: : ", parsedData.totalCount);
         res.status(200).json({
-          count: userCountRedis.buttonCounts,
-          totalCount: userCountRedis.totalCount,
+          count: parsedData.buttonCounts,
+          totalCount: parsedData.totalCount,
         });
       } 
       else {
@@ -322,7 +323,7 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
         console.log("TOTAL COUNT from db :: : ", response.totalCount);
 
         // set the data in redis 
-        await redisConnectionClient.set(cacheKey, response); 
+        await redisConnectionClient.set(cacheKey, JSON.stringify(response)); 
         console.log(`Data set in redis for key: ${cacheKey}`);
 
         res.status(200).json({
