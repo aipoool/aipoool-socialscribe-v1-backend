@@ -267,9 +267,19 @@ app.post("/api/setUserStatus", verifyToken, async (req, res) => {
 
 app.post("/api/getUserRating", verifyToken, async (req, res) => {
   const { id } = req.body;
+  const cacheKey = `user:${id}:rating`;
   try {
-      const response = await userdb.findById(id);
-      res.status(200).json({ rating: response.userRating });
+      const userRatingRedis = await redisConnectionClient.get(cacheKey);
+      if (userRatingRedis) {
+        const parsedData = JSON.parse(userRatingRedis); 
+        console.log("Rating from the redis :: " , parsedData.userRating);
+        res.status(200).json({ rating: parsedData.userRating });
+      }else {
+        const response = await userdb.findById(id);
+        await redisConnectionClient.set(cacheKey, JSON.stringify(response));
+        res.status(200).json({ rating: response.userRating });
+      }
+
   } catch (error) {
       res.status(500).send({ message: "Error retrieving user rating" });
   }
@@ -278,6 +288,7 @@ app.post("/api/getUserRating", verifyToken, async (req, res) => {
 
 app.post("/api/setCounter", verifyToken, async (req, res) => {
   const { id, count, accessToken } = req.body;
+  const cacheKey = `user:${id}:counter`;
   console.log(req.body);
 
   try {
@@ -288,6 +299,10 @@ app.post("/api/setCounter", verifyToken, async (req, res) => {
         { new: true, useFindAndModify: false }
       );
       console.log("Updated User: ", updatedUser);
+
+      // Update the Redis cache with the new counter value
+      await redisConnectionClient.set(cacheKey, JSON.stringify(updatedUser));
+      console.log(`Data updated in redis for key: ${cacheKey}`);
 
       res.send({ message: "Counter updated successfully" });
     }
