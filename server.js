@@ -778,7 +778,7 @@ if (cluster.isMaster) {
   }
 
   // The of the number of cores 
-  console.log(`Available CPUs: ${CPUs}`) 
+  console.log(`Available CPUs: ${numWorkers}`) ;
 
   cluster.on("online",(worker, code, signal) => { 
       console.log(`worker ${worker.process.pid} is online`); 
