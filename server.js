@@ -526,7 +526,7 @@ app.post("/api/check", async (req, res) => {
 //       event = stripe.webhooks.constructEvent(req.body, signature, endptSecret);
 //       console.log("Event Type ::: ", event.type);
 //     } catch (err) {
-//       console.log(⚠️  Webhook signature verification failed.`, err.message);
+//       console.log(`⚠️  Webhook signature verification failed.`, err.message);
 //       return res.sendStatus(400);
 //     }
 //   }
@@ -761,7 +761,14 @@ app.get("/test", (req, res) => {
 
 if (cluster.isMaster) {
   // Limit the number of workers to 2 due to resource constraints
-  const numWorkers = Math.min(2, os.cpus().length);
+
+  /** NOTE : WE CAN LIMIT THE NUMBER OF WORKERS IN THE FOLLOWING MANNER - 
+   * 
+   * const numWorkers = Math.min(2, os.cpus().length);
+   * 
+   * FOR NOW , WE SHALL GO TO THE MAX WORKERS
+   */
+  const numWorkers = os.cpus().length;
 
   console.log(`Master ${process.pid} is running`);
   console.log(`Forking ${numWorkers} workers...`);
