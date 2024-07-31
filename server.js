@@ -806,7 +806,6 @@ app.get("/test", (req, res) => {
 
 // clusters with round robin 
 if (cluster.isPrimary) {
-  // Determine the number of CPU cores
   const numCPUs = os.cpus().length;
 
   console.log(`Primary ${process.pid} is running`);
@@ -828,12 +827,10 @@ if (cluster.isPrimary) {
     cluster.fork();
   });
 
-  // Implement round-robin load balancing
   const workers = Object.values(cluster.workers);
   let currentIndex = 0;
 
   const server = net.createServer({ pauseOnConnect: true }, (connection) => {
-    // Distribute the connection in a round-robin manner
     const worker = workers[currentIndex];
     worker.send('sticky-session:connection', connection);
     currentIndex = (currentIndex + 1) % workers.length;
@@ -843,26 +840,43 @@ if (cluster.isPrimary) {
   server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
   });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use`);
+    } else {
+      console.error(`Server error: ${err}`);
+    }
+    process.exit(1);
+  });
 } else {
   const PORT = process.env.PORT || 1997;
 
-  // This will allow the worker to handle connections
-  const server = app.listen(PORT, () => {
+  // Worker processes do not listen directly on the port
+  const server = app.listen(0, () => {
     console.log(
       `${chalk.green.bold('✅')} 👍Server running in ${chalk.yellow.bold(
         process.env.NODE_ENV
-      )} mode on port ${chalk.blue.bold(PORT)}`
+      )} mode on worker ${chalk.blue.bold(process.pid)}`
     );
   });
 
-  // Handle the connections passed from the primary process
   process.on('message', (message, connection) => {
     if (message === 'sticky-session:connection') {
       server.emit('connection', connection);
       connection.resume();
     }
   });
-}
 
+  // Example route
+  app.get('/', (req, res) => {
+    res.send('Hello from worker ' + process.pid);
+  });
+
+  // Handle errors in the worker process
+  server.on('error', (err) => {
+    console.error(`Worker ${process.pid} server error: ${err}`);
+  });
+}
 
 
