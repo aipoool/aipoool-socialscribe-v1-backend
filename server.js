@@ -16,7 +16,6 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import cluster from "cluster";
 import os from "os";
-import net from "net";
 let redisConnectionClient; 
 
 await connectionToDB();
@@ -761,122 +760,47 @@ app.get("/test", (req, res) => {
 // getting the clustering code here 
 // normal clustering without round-robin
 
-// if (cluster.isPrimary) {
-//   // Limit the number of workers to 2 due to resource constraints
-
-//   /** NOTE : WE CAN LIMIT THE NUMBER OF WORKERS IN THE FOLLOWING MANNER - 
-//    * 
-//    * const numWorkers = Math.min(2, os.cpus().length);
-//    * 
-//    * FOR NOW , WE SHALL GO TO THE MAX WORKERS
-//    */
-//   const numWorkers = os.cpus().length;
-
-//   console.log(`Master ${process.pid} is running`);
-//   console.log(`Forking ${numWorkers} workers...`);
-
-//   for (let i = 0; i < numWorkers; i++) {
-//       cluster.fork();
-//   }
-
-//   // The of the number of cores 
-//   console.log(`Available CPUs: ${numWorkers}`) ;
-
-//   cluster.on("online",(worker, code, signal) => { 
-//       console.log(`worker ${worker.process.pid} is online`); 
-//   }); 
-
-//   cluster.on('exit', (worker, code, signal) => {
-//       console.log(`Worker ${worker.process.pid} died`);
-//       console.log('Forking a new worker...');
-//       cluster.fork();
-//   });
-// } else {
-//   const PORT = process.env.PORT || 1997;
-
-//   app.listen(PORT, () => {
-//     console.log(
-//       `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
-//         process.env.NODE_ENV
-//       )} mode on port ${chalk.blue.bold(PORT)}`
-//     );
-//   });
-// }
-
-
-// clusters with round robin 
 if (cluster.isPrimary) {
-  const numCPUs = os.cpus().length;
+  // Limit the number of workers to 2 due to resource constraints
 
-  console.log(`Primary ${process.pid} is running`);
-  console.log(`Forking ${numCPUs} workers...`);
+  /** NOTE : WE CAN LIMIT THE NUMBER OF WORKERS IN THE FOLLOWING MANNER - 
+   * 
+   * const numWorkers = Math.min(2, os.cpus().length);
+   * 
+   * FOR NOW , WE SHALL GO TO THE MAX WORKERS
+   */
+  const numWorkers = os.cpus().length;
 
-  for (let i = 0; i < numCPUs; i++) {
-    cluster.fork();
+  console.log(`Master ${process.pid} is running`);
+  console.log(`Forking ${numWorkers} workers...`);
+
+  for (let i = 0; i < numWorkers; i++) {
+      cluster.fork();
   }
 
-  console.log(`Available CPUs: ${numCPUs}`);
+  // The of the number of cores 
+  console.log(`Available CPUs: ${numWorkers}`) ;
 
-  cluster.on('online', (worker) => {
-    console.log(`Worker ${worker.process.pid} is online`);
-  });
+  cluster.on("online",(worker, code, signal) => { 
+      console.log(`worker ${worker.process.pid} is online`); 
+  }); 
 
   cluster.on('exit', (worker, code, signal) => {
-    console.log(`Worker ${worker.process.pid} died`);
-    console.log('Forking a new worker...');
-    cluster.fork();
-  });
-
-  const workers = Object.values(cluster.workers);
-  let currentIndex = 0;
-
-  const server = net.createServer({ pauseOnConnect: true }, (connection) => {
-    const worker = workers[currentIndex];
-    worker.send('sticky-session:connection', connection);
-    currentIndex = (currentIndex + 1) % workers.length;
-  });
-
-  const PORT = process.env.PORT || 1997;
-  server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use`);
-    } else {
-      console.error(`Server error: ${err}`);
-    }
-    process.exit(1);
+      console.log(`Worker ${worker.process.pid} died`);
+      console.log('Forking a new worker...');
+      cluster.fork();
   });
 } else {
   const PORT = process.env.PORT || 1997;
 
-  // Worker processes do not listen directly on the port
-  const server = app.listen(0, () => {
+  app.listen(PORT, () => {
     console.log(
-      `${chalk.green.bold('✅')} 👍Server running in ${chalk.yellow.bold(
+      `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
         process.env.NODE_ENV
-      )} mode on worker ${chalk.blue.bold(process.pid)}`
+      )} mode on port ${chalk.blue.bold(PORT)}`
     );
   });
-
-  process.on('message', (message, connection) => {
-    if (message === 'sticky-session:connection') {
-      server.emit('connection', connection);
-      connection.resume();
-    }
-  });
-
-  // Example route
-  app.get('/', (req, res) => {
-    res.send('Hello from worker ' + process.pid);
-  });
-
-  // Handle errors in the worker process
-  server.on('error', (err) => {
-    console.error(`Worker ${process.pid} server error: ${err}`);
-  });
 }
+
 
 
