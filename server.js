@@ -14,6 +14,8 @@ import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import cluster from "cluster";
+import os from "os";
 let redisConnectionClient; 
 
 await connectionToDB();
@@ -524,7 +526,7 @@ app.post("/api/check", async (req, res) => {
 //       event = stripe.webhooks.constructEvent(req.body, signature, endptSecret);
 //       console.log("Event Type ::: ", event.type);
 //     } catch (err) {
-//       console.log(`⚠️  Webhook signature verification failed.`, err.message);
+//       console.log(⚠️  Webhook signature verification failed.`, err.message);
 //       return res.sendStatus(400);
 //     }
 //   }
