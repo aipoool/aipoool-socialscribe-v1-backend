@@ -777,6 +777,13 @@ if (cluster.isMaster) {
       cluster.fork();
   }
 
+  // The of the number of cores 
+  console.log(`Available CPUs: ${CPUs}`) 
+
+  cluster.on("online",(worker, code, signal) => { 
+      console.log(`worker ${worker.process.pid} is online`); 
+  }); 
+
   cluster.on('exit', (worker, code, signal) => {
       console.log(`Worker ${worker.process.pid} died`);
       console.log('Forking a new worker...');
