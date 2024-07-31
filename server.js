@@ -758,46 +758,108 @@ app.get("/test", (req, res) => {
 
 
 // getting the clustering code here 
+// normal clustering without round-robin
 
-if (cluster.isMaster) {
-  // Limit the number of workers to 2 due to resource constraints
+// if (cluster.isPrimary) {
+//   // Limit the number of workers to 2 due to resource constraints
 
-  /** NOTE : WE CAN LIMIT THE NUMBER OF WORKERS IN THE FOLLOWING MANNER - 
-   * 
-   * const numWorkers = Math.min(2, os.cpus().length);
-   * 
-   * FOR NOW , WE SHALL GO TO THE MAX WORKERS
-   */
-  const numWorkers = os.cpus().length;
+//   /** NOTE : WE CAN LIMIT THE NUMBER OF WORKERS IN THE FOLLOWING MANNER - 
+//    * 
+//    * const numWorkers = Math.min(2, os.cpus().length);
+//    * 
+//    * FOR NOW , WE SHALL GO TO THE MAX WORKERS
+//    */
+//   const numWorkers = os.cpus().length;
 
-  console.log(`Master ${process.pid} is running`);
-  console.log(`Forking ${numWorkers} workers...`);
+//   console.log(`Master ${process.pid} is running`);
+//   console.log(`Forking ${numWorkers} workers...`);
 
-  for (let i = 0; i < numWorkers; i++) {
-      cluster.fork();
+//   for (let i = 0; i < numWorkers; i++) {
+//       cluster.fork();
+//   }
+
+//   // The of the number of cores 
+//   console.log(`Available CPUs: ${numWorkers}`) ;
+
+//   cluster.on("online",(worker, code, signal) => { 
+//       console.log(`worker ${worker.process.pid} is online`); 
+//   }); 
+
+//   cluster.on('exit', (worker, code, signal) => {
+//       console.log(`Worker ${worker.process.pid} died`);
+//       console.log('Forking a new worker...');
+//       cluster.fork();
+//   });
+// } else {
+//   const PORT = process.env.PORT || 1997;
+
+//   app.listen(PORT, () => {
+//     console.log(
+//       `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
+//         process.env.NODE_ENV
+//       )} mode on port ${chalk.blue.bold(PORT)}`
+//     );
+//   });
+// }
+
+
+// clusters with round robin 
+if (cluster.isPrimary) {
+  // Determine the number of CPU cores
+  const numCPUs = os.cpus().length;
+
+  console.log(`Primary ${process.pid} is running`);
+  console.log(`Forking ${numCPUs} workers...`);
+
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
   }
 
-  // The of the number of cores 
-  console.log(`Available CPUs: ${numWorkers}`) ;
+  console.log(`Available CPUs: ${numCPUs}`);
 
-  cluster.on("online",(worker, code, signal) => { 
-      console.log(`worker ${worker.process.pid} is online`); 
-  }); 
+  cluster.on('online', (worker) => {
+    console.log(`Worker ${worker.process.pid} is online`);
+  });
 
   cluster.on('exit', (worker, code, signal) => {
-      console.log(`Worker ${worker.process.pid} died`);
-      console.log('Forking a new worker...');
-      cluster.fork();
+    console.log(`Worker ${worker.process.pid} died`);
+    console.log('Forking a new worker...');
+    cluster.fork();
+  });
+
+  // Implement round-robin load balancing
+  const workers = Object.values(cluster.workers);
+  let currentIndex = 0;
+
+  const server = net.createServer({ pauseOnConnect: true }, (connection) => {
+    // Distribute the connection in a round-robin manner
+    const worker = workers[currentIndex];
+    worker.send('sticky-session:connection', connection);
+    currentIndex = (currentIndex + 1) % workers.length;
+  });
+
+  const PORT = process.env.PORT || 1997;
+  server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
   });
 } else {
   const PORT = process.env.PORT || 1997;
 
-  app.listen(PORT, () => {
+  // This will allow the worker to handle connections
+  const server = app.listen(PORT, () => {
     console.log(
-      `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
+      `${chalk.green.bold('✅')} 👍Server running in ${chalk.yellow.bold(
         process.env.NODE_ENV
       )} mode on port ${chalk.blue.bold(PORT)}`
     );
+  });
+
+  // Handle the connections passed from the primary process
+  process.on('message', (message, connection) => {
+    if (message === 'sticky-session:connection') {
+      server.emit('connection', connection);
+      connection.resume();
+    }
   });
 }
 
