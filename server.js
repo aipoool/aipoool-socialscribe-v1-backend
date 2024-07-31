@@ -233,6 +233,14 @@ app.get("/api/test", (req, res) => {
   res.json({ Hi: "This is the API Route" });
 });
 
+app.get("/heavy" , (req, res) => {
+  let total = 0; 
+  for(let i=0 ; i< 50_000_000 ; i++){
+    total++; 
+  }
+  res.send("Total: " + total); 
+});
+
 /**OPENAI API ROUTES */
 app.options("/api/generate-response", cors());
 app.post("/api/generate-response", verifyToken, async (req, res) => {
