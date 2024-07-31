@@ -165,6 +165,14 @@ app.get("/auth/test", (req, res) => {
   res.json({ Hi: "This is the AUTH Route, after the edits have been made " });
 });
 
+app.get("/heavy" , (req, res) => {
+  let total = 0; 
+  for(let i=0 ; i< 50_000_000 ; i++){
+    total++; 
+  }
+  res.send("Total: " + total); 
+});
+
 
 // initial google oauth
 app.get(
@@ -231,14 +239,6 @@ app.get("/auth/logout", async (req, res, next) => {
 // Testing routes
 app.get("/api/test", (req, res) => {
   res.json({ Hi: "This is the API Route" });
-});
-
-app.get("/heavy" , (req, res) => {
-  let total = 0; 
-  for(let i=0 ; i< 50_000_000 ; i++){
-    total++; 
-  }
-  res.send("Total: " + total); 
 });
 
 /**OPENAI API ROUTES */
@@ -753,12 +753,37 @@ app.get("/test", (req, res) => {
   res.json({ Hi: "This is a... testing message" });
 });
 
-const PORT = process.env.PORT || 1997;
 
-app.listen(PORT, () => {
-  console.log(
-    `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
-      process.env.NODE_ENV
-    )} mode on port ${chalk.blue.bold(PORT)}`
-  );
-});
+
+// getting the clustering code here 
+
+if (cluster.isMaster) {
+  // Limit the number of workers to 2 due to resource constraints
+  const numWorkers = Math.min(2, os.cpus().length);
+
+  console.log(`Master ${process.pid} is running`);
+  console.log(`Forking ${numWorkers} workers...`);
+
+  for (let i = 0; i < numWorkers; i++) {
+      cluster.fork();
+  }
+
+  cluster.on('exit', (worker, code, signal) => {
+      console.log(`Worker ${worker.process.pid} died`);
+      console.log('Forking a new worker...');
+      cluster.fork();
+  });
+} else {
+  const PORT = process.env.PORT || 1997;
+
+  app.listen(PORT, () => {
+    console.log(
+      `${chalk.green.bold("✅")} 👍Server running in ${chalk.yellow.bold(
+        process.env.NODE_ENV
+      )} mode on port ${chalk.blue.bold(PORT)}`
+    );
+  });
+}
+
+
+
