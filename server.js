@@ -769,8 +769,7 @@ if (cluster.isPrimary) {
    * 
    * FOR NOW , WE SHALL GO TO THE MAX WORKERS
    */
-
-  const numWorkers = Math.min(4, os.cpus().length);
+  const numWorkers = os.cpus().length;
 
   console.log(`Master ${process.pid} is running`);
   console.log(`Forking ${numWorkers} workers...`);
