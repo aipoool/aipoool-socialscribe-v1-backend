@@ -42,7 +42,7 @@ app.use(
 );
 
 
-// Middlewares here
+// Middleware
 app.use(express.json());
 
 
