@@ -236,6 +236,8 @@ app.get("/auth/logout", verifyToken, async (req, res, next) => {
   const { id } = req.body;
   const cacheKey = `user:${id}:counter`;
 
+  console.log(cacheKey);
+
     // Clear the specific cache key in Redis
     redisClient.del(cacheKey, (err, response) => {
       if (err) {
