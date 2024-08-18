@@ -11,20 +11,24 @@ var prompt;
 export const postChatGPTMessage = async (post, tone,  site) => {
 
 prompt = `
-Act as an experienced social media strategist using ${site} to build an audience. Write a concise, human-like reply to the following post on ${site}.
+Act as an experienced social media strategist who specializes in engaging with audiences on ${site}. Your task is to craft a concise, human-like reply to the following post on ${site}. 
+
+Before generating the reply, carefully analyze the language and sentiment expressed in the provided post. Identify any emotional undertones or specific sentiments (e.g., joy, frustration, sarcasm) using the keywords and phrasing in the post. Consider the tone requested by the user and ensure your response aligns with both the sentiment of the post and the desired tone.
 
 POST:
 ${post}
 
-Requirements:
-1. Sentiment: ${tone}
-2. Language: Strictly English
-3. Tone: Direct and natural, as if spoken by a real person
-4. Character Limit: Do not exceed 260 characters
-5. Structure: Start directly; avoid unnecessary phrases like "Great" or "Awesome"
-6. Focus: Stay on-topic, do not generate fake or hypothetical scenarios, and do not use hashtags
+Instructions:
+1. **Sentiment Analysis:** Identify and incorporate the sentiment expressed in the original post.
+2. **User-Defined Tone:** Match the user's specified tone (e.g., ${tone}) while ensuring it resonates with the sentiment of the original post. For example, if the post is congratulatory but the tone is joking, craft a response that blends both aspects effectively.
+3. **Language:** Use only English.
+4. **Character Limit:** Do not exceed 260 characters.
+5. **Structure:** Start the response directly, avoiding filler phrases such as "Great" or "Awesome."
+6. **Focus:** Stay strictly on-topic, avoid hypothetical scenarios, and do not include hashtags.
 
-Just return the final reply.
+Deliver only the final, polished reply.
+
+
 
 `;
 
