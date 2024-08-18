@@ -190,27 +190,30 @@ app.get(
 );
 
 app.get("/auth/login/success", async (req, res) => {
-  console.log("Request data from login/success : ", req.user);
-
-  const token = jwt.sign({ 
-    id: req.user._id, 
-    accessToken : req.user.accessToken, 
-    email : req.user.email,
-  }, process.env.JWT_KEY, {
-    expiresIn: "3 days", // Set token expiration as needed
-  });
-
-  console.log("The jwt token generated is : " , token); 
-
-  if (req.user) {
-    res.status(200).json({ 
-      message: "User Login", 
-      user: req.user,
-      jwtToken : token
-    });
-  } else {
-    res.status(403).json({ message: "User Not Authorized" });
+  if (!req.user) {
+    // Redirect to the frontend with a query parameter indicating no user data
+    return res.redirect(
+      "https://socialscribe-aipoool.onrender.com/redirecting?status=no-user-data"
+    );
   }
+
+  const token = jwt.sign(
+    {
+      id: req.user._id,
+      accessToken: req.user.accessToken,
+      email: req.user.email,
+    },
+    process.env.JWT_KEY,
+    {
+      expiresIn: "3 days",
+    }
+  );
+
+  res.status(200).json({
+    message: "User Login",
+    user: req.user,
+    jwtToken: token,
+  });
 
 });
 
