@@ -232,12 +232,24 @@ app.post("/auth/userdata", verifyToken, async (req, res) => {
 });
 
 
-app.get("/auth/logout", async (req, res, next) => {
-  req.logout(function (err) {
-    if (err) {
-      return next(err);
-    }
-    res.redirect("https://socialscribe-aipoool.onrender.com/login");
+app.get("/auth/logout", verifyToken, async (req, res, next) => {
+  const { id } = req.body;
+  const cacheKey = `user:${id}:counter`;
+
+    // Clear the specific cache key in Redis
+    redisClient.del(cacheKey, (err, response) => {
+      if (err) {
+          console.error('Error clearing Redis cache:', err);
+          return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
+      }
+
+      if (response === 1) {
+          console.log(`Cache cleared for key: ${cacheKey}`);
+          res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
+      } else {
+          console.log(`Cache key not found: ${cacheKey}`);
+          res.status(404).json({ success: false, message: 'Cache key not found.' });
+      }
   });
 });
 
