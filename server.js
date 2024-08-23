@@ -14,6 +14,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import querystring from "querystring";
+import axios from "axios";
 import cluster from "cluster";
 import os from "os";
 let redisConnectionClient; 
@@ -152,7 +153,8 @@ async function getTokens({ code, clientId, clientSecret, redirectUri }) {
 
 // Getting login URL
 app.get("/auth/google/url", (req, res) => {
-  return res.send(getGoogleAuthURL());
+  const googleAuthURL = getGoogleAuthURL();
+  return res.redirect(googleAuthURL);
 });
 
 // Handling the callback from Google OAuth
