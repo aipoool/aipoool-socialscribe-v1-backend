@@ -255,7 +255,7 @@ app.post("/auth/logout", verifyToken, async (req, res, next) => {
   //     }
   // });
 
-  redisConnectionClient.del(`user:${id}:counter`);
+  redisConnectionClient.del(cacheKeys);
   res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
 });
 
