@@ -232,25 +232,26 @@ app.post("/auth/userdata", verifyToken, async (req, res) => {
 });
 
 
-app.get("/auth/logout", verifyToken, async (req, res, next) => {
+app.post("/auth/logout", verifyToken, async (req, res, next) => {
   const { id } = req.body;
-  const cacheKey = `user:${id}:counter`;
+  const cacheKeys = [`user:${id}:counter`, `user:${id}:rating`];
 
-  console.log(cacheKey);
+  console.log(`Clearing cache for keys: ${cacheKeys.join(', ')}`);
 
     // Clear the specific cache key in Redis
-    redisClient.del(cacheKey, (err, response) => {
+    redisClient.del(cacheKeys, (err, response) => {
       if (err) {
           console.error('Error clearing Redis cache:', err);
           return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
       }
 
-      if (response === 1) {
-          console.log(`Cache cleared for key: ${cacheKey}`);
-          res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
+      // Check if at least one key was deleted
+      if (response > 0) {
+        console.log(`Cache cleared for keys: ${cacheKeys.join(', ')}`);
+        res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
       } else {
-          console.log(`Cache key not found: ${cacheKey}`);
-          res.status(404).json({ success: false, message: 'Cache key not found.' });
+          console.log(`Cache keys not found: ${cacheKeys.join(', ')}`);
+          res.status(404).json({ success: false, message: 'Cache keys not found.' });
       }
   });
 });
@@ -381,25 +382,6 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
   }
 });
 
-
-
-// app.post("/api/getCounter", verifyToken, async (req, res) => {
-//   const { id, accessToken } = req.body;
-//   try {
-//     if (accessToken) {
-//       const response = await userdb.findById(id);
-//       console.log("COUNTER GET :: : ", response.buttonCounts);
-//       console.log("TOTAL COUNT :: : ", response.totalCount);
-//       res.status(200).json({
-//         count: response.buttonCounts,
-//         totalCount: response.totalCount,
-//       });
-//     }
-//   } catch (error) {
-//     console.error("Error getting Counter:", error);
-//     res.status(500).send({ message: "Error getting Counter" });
-//   }
-// });
 
 /**WILL BE REMOVING ONCE THE CHANGES ARE BEING MADE COMPLETELY */
 app.post("/api/check", async (req, res) => {
