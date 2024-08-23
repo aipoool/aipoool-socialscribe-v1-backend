@@ -239,7 +239,7 @@ app.post("/auth/logout", verifyToken, async (req, res, next) => {
   console.log(`Clearing cache for keys: ${cacheKeys.join(', ')}`);
 
     // Clear the specific cache key in Redis
-    redisConnectionClient.del(cacheKeys, (err, response) => {
+    redisConnectionClient.del(`user:${id}:counter`, (err, response) => {
       if (err) {
           console.error('Error clearing Redis cache:', err);
           return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
