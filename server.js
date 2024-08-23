@@ -195,6 +195,8 @@ app.get("/auth/google/callback", async (req, res) => {
     { new: true, upsert: true } // Create the user if not found
   );
 
+  console.log("User found/created at MongoDB ::: " , user); 
+
   const token = jwt.sign(
     {
       id: user._id,
@@ -232,13 +234,21 @@ app.get("/heavy" , (req, res) => {
 });
 
 app.get("/auth/login/success", (req, res) => {
+  // Extract the token from the cookies
+  const token = req.cookies[process.env.COOKIE_KEY];
+
+  if (!token) {
+    // If no token is found, return a 401 Unauthorized error
+    return res.status(401).json({ message: "Authentication token is missing" });
+  }
+
   try {
-    console.log("Here are the user details from the route /auth/login/success :: ", req);  
-    const decoded = jwt.verify(req.cookies[process.env.COOKIE_KEY], process.env.JWT_KEY);
-    return res.send(decoded);
+    // Verify the token
+    const decoded = jwt.verify(token, process.env.JWT_KEY);
+    return res.status(200).send(decoded);
   } catch (err) {
-    console.log(err);
-    res.send(null);
+    console.log("JWT verification failed:", err.message);
+    return res.status(401).json({ message: "Invalid authentication token" });
   }
 });
 
