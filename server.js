@@ -201,12 +201,12 @@ app.get("/auth/google/callback", async (req, res) => {
       googleId: user.googleId,
       email: user.email,
     },
-    JWT_KEY,
+    process.env.JWT_KEY,
     { expiresIn: "3 days" }
   );
 
   // Set the JWT token in a cookie
-  res.cookie(COOKIE_KEY, token, {
+  res.cookie(process.env.COOKIE_KEY, token, {
     maxAge: 900000,
     httpOnly: true,
     secure: false, // Change to `true` if using HTTPS
@@ -233,7 +233,7 @@ app.get("/heavy" , (req, res) => {
 
 app.get("/auth/login/success", (req, res) => {
   try {
-    const decoded = jwt.verify(req.cookies[COOKIE_KEY], JWT_KEY);
+    const decoded = jwt.verify(req.cookies[process.env.COOKIE_KEY], process.env.JWT_KEY);
     return res.send(decoded);
   } catch (err) {
     console.log(err);
