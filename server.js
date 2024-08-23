@@ -207,6 +207,8 @@ app.get("/auth/google/callback", async (req, res) => {
     { expiresIn: "3 days" }
   );
 
+  console.log("token generated at MongoDB ::: " , token); 
+
   // Set the JWT token in a cookie
   res.cookie(process.env.COOKIE_KEY, token, {
     maxAge: 900000,
