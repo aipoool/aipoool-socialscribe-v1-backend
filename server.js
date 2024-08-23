@@ -239,21 +239,24 @@ app.post("/auth/logout", verifyToken, async (req, res, next) => {
   console.log(`Clearing cache for keys: ${cacheKeys.join(', ')}`);
 
     // Clear the specific cache key in Redis
-    redisConnectionClient.del(`user:${id}:counter`, (err, response) => {
-      if (err) {
-          console.error('Error clearing Redis cache:', err);
-          return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
-      }
+  //   redisConnectionClient.del(`user:${id}:counter`, (err, response) => {
+  //     if (err) {
+  //         console.error('Error clearing Redis cache:', err);
+  //         return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
+  //     }
 
-      // Check if at least one key was deleted
-      if (response > 0) {
-        console.log(`Cache cleared for keys: ${cacheKeys.join(', ')}`);
-        res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
-      } else {
-          console.log(`Cache keys not found: ${cacheKeys.join(', ')}`);
-          res.status(404).json({ success: false, message: 'Cache keys not found.' });
-      }
-  });
+  //     // Check if at least one key was deleted
+  //     if (response > 0) {
+  //       console.log(`Cache cleared for keys: ${cacheKeys.join(', ')}`);
+  //       res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
+  //     } else {
+  //         console.log(`Cache keys not found: ${cacheKeys.join(', ')}`);
+  //         res.status(404).json({ success: false, message: 'Cache keys not found.' });
+  //     }
+  // });
+
+  redisConnectionClient.del(`user:${id}:counter`);
+  res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
 });
 
 // Testing routes
@@ -305,6 +308,7 @@ app.post("/api/getUserRating", verifyToken, async (req, res) => {
       }else {
         const response = await userdb.findById(id);
         await redisConnectionClient.set(cacheKey, JSON.stringify(response));
+        console.log("Rating set into redis with key :: ", cacheKey);
         res.status(200).json({ rating: response.userRating });
       }
 
