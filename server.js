@@ -2,10 +2,8 @@ import "dotenv/config";
 import chalk from "chalk";
 import express from "express";
 import morgan from "morgan";
-import passport from "passport";
 import session from "express-session";
 import MongoStore from "connect-mongo";
-import OAuth2Strategy from "passport-google-oauth20";
 import cors from "cors";
 import userdb from "./model/userSchema.js";
 import connectionToDB from "./db/connection.js";
@@ -15,6 +13,7 @@ import OpenAI from "openai";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import querystring from "querystring";
 import cluster from "cluster";
 import os from "os";
 let redisConnectionClient; 
@@ -41,6 +40,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.use(cookieParser());
 
 
 // Middleware
