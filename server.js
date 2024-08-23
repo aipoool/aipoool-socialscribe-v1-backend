@@ -233,7 +233,7 @@ app.get("/heavy" , (req, res) => {
 
 app.get("/auth/login/success", (req, res) => {
   try {
-    console.log("Here are the user details from the route /auth/login/success :: ", req.user);  
+    console.log("Here are the user details from the route /auth/login/success :: ", req);  
     const decoded = jwt.verify(req.cookies[process.env.COOKIE_KEY], process.env.JWT_KEY);
     return res.send(decoded);
   } catch (err) {
