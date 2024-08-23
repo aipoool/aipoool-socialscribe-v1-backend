@@ -209,15 +209,20 @@ app.get("/auth/google/callback", async (req, res) => {
 
   console.log("token generated at MongoDB ::: " , token); 
 
-  // Set the JWT token in a cookie
-  res.cookie(process.env.COOKIE_KEY, token, {
-    maxAge: 900000,
-    httpOnly: true,
-    secure: false, // Change to `true` if using HTTPS
-  });
+    // Encrypt the token using AES
+    const algorithm = 'aes-256-cbc';
+    const key = crypto.scryptSync("kaif123", 'salt', 32); // Derive key from password
+    const iv = crypto.randomBytes(16); // Initialization vector
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+  
+    let encryptedToken = cipher.update(token, "utf8", "hex");
+    encryptedToken += cipher.final("hex");
+  
+    // Convert IV to hex and prepend it to the encrypted token (necessary for decryption)
+    const encryptedTokenWithIv = iv.toString('hex') + ':' + encryptedToken;
 
   // Redirect to the frontend
-  res.redirect("https://socialscribe-aipoool.onrender.com/redirecting");
+  res.redirect(`https://socialscribe-aipoool.onrender.com/redirecting?token=${encodeURIComponent(encryptedTokenWithIv)}`);
 });
 
 
