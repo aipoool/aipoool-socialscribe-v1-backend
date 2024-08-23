@@ -14,6 +14,7 @@ import { postChatGPTMessage } from "./generateComment.js";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 import cluster from "cluster";
 import os from "os";
 let redisConnectionClient; 
@@ -107,60 +108,112 @@ app.use(function (req, res, next) {
   next();
 });
 
+function getGoogleAuthURL() {
+  const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+  const options = {
+    redirect_uri: 'https://socialscribe-v1-backend.onrender.com/auth/google/callback',
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    access_type: "offline",
+    response_type: "code",
+    prompt: "consent",
+    scope: [
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email",
+    ].join(" "),
+  };
 
-// setup passport
-app.use(passport.initialize());
-app.use(passport.session());
+  return `${rootUrl}?${querystring.stringify(options)}`;
+}
 
-passport.use(
-  new OAuth2Strategy.Strategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      scope: ["profile", "email"],
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      const existingUser = await userdb.findOneAndUpdate(
-        { googleId: profile.id },
-        {
-          accessToken,
-          refreshToken,
-          googleId: profile.id,
-          userName: profile.displayName,
-          email: profile.emails[0].value,
-        }
-      );
+// Helper function to exchange code for tokens
+async function getTokens({ code, clientId, clientSecret, redirectUri }) {
+  const url = "https://oauth2.googleapis.com/token";
+  const values = {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+  };
 
-      if (existingUser) {
-        return done(null, existingUser);
-      }
+  return axios
+    .post(url, querystring.stringify(values), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    })
+    .then((res) => res.data)
+    .catch((error) => {
+      console.error("Failed to fetch auth tokens", error.message);
+      throw new Error(error.message);
+    });
+}
 
-      const newUser = await new userdb({
-        accessToken,
-        refreshToken,
-        googleId: profile.id,
-        userName: profile.displayName,
-        email: profile.emails[0].value,
-      }).save();
-
-      done(null, newUser);
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
+// Getting login URL
+app.get("/auth/google/url", (req, res) => {
+  return res.send(getGoogleAuthURL());
 });
 
-passport.deserializeUser((id, done) => {
-  userdb.findById(id).then((user) => {
-    done(null, user);
+// Handling the callback from Google OAuth
+app.get("/auth/google/callback", async (req, res) => {
+  const code = req.query.code ;
+
+  const { id_token, access_token } = await getTokens({
+    code,
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    redirectUri: "https://socialscribe-v1-backend.onrender.com/auth/google/callback",
   });
+
+  // Fetch the user's profile using the access token
+  const googleUser = await axios
+    .get(
+      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
+      {
+        headers: {
+          Authorization: `Bearer ${id_token}`,
+        },
+      }
+    )
+    .then((res) => res.data)
+    .catch((error) => {
+      console.error("Failed to fetch user data");
+      throw new Error(error.message);
+    });
+
+  // Find or create a user in your database
+  let user = await userdb.findOneAndUpdate(
+    { googleId: googleUser.id },
+    {
+      googleId: googleUser.id,
+      userName: googleUser.name,
+      email: googleUser.email,
+    },
+    { new: true, upsert: true } // Create the user if not found
+  );
+
+  const token = jwt.sign(
+    {
+      id: user._id,
+      googleId: user.googleId,
+      email: user.email,
+    },
+    JWT_KEY,
+    { expiresIn: "3 days" }
+  );
+
+  // Set the JWT token in a cookie
+  res.cookie(COOKIE_KEY, token, {
+    maxAge: 900000,
+    httpOnly: true,
+    secure: false, // Change to `true` if using HTTPS
+  });
+
+  // Redirect to the frontend
+  res.redirect("https://socialscribe-aipoool.onrender.com/redirecting");
 });
 
-///app.use("/auth" , auth);
-/**AUTH FILES ROUTES PASTING HERE FOR CHECKING THE FUNCTIONALITY */
+
 
 // Testing routes
 app.get("/auth/test", (req, res) => {
@@ -175,47 +228,17 @@ app.get("/heavy" , (req, res) => {
   res.send("Total: " + total); 
 });
 
-
-// initial google oauth
-app.get(
-  "/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-app.get(
-  "/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "https://socialscribe-aipoool.onrender.com/login",
-    successRedirect: "https://socialscribe-aipoool.onrender.com/redirecting",
-  })
-);
-
-app.get("/auth/login/success", async (req, res) => {
-  if (!req.user) {
-    // Redirect to the frontend with a query parameter indicating no user data
-    return res.redirect(
-      "https://socialscribe-aipoool.onrender.com/redirecting?status=no-user-data"
-    );
+app.get("/auth/login/success", (req, res) => {
+  try {
+    const decoded = jwt.verify(req.cookies[COOKIE_KEY], JWT_KEY);
+    return res.send(decoded);
+  } catch (err) {
+    console.log(err);
+    res.send(null);
   }
-
-  const token = jwt.sign(
-    {
-      id: req.user._id,
-      accessToken: req.user.accessToken,
-      email: req.user.email,
-    },
-    process.env.JWT_KEY,
-    {
-      expiresIn: "3 days",
-    }
-  );
-
-  res.status(200).json({
-    message: "User Login",
-    user: req.user,
-    jwtToken: token,
-  });
-
 });
+
+
 
 app.post("/auth/userdata", verifyToken, async (req, res) => {
   const { id, accessToken } = req.body;
@@ -237,23 +260,6 @@ app.post("/auth/logout", verifyToken, async (req, res, next) => {
   const cacheKeys = [`user:${id}:counter`, `user:${id}:rating`];
 
   console.log(`Clearing cache for keys: ${cacheKeys.join(', ')}`);
-
-    // Clear the specific cache key in Redis
-  //   redisConnectionClient.del(`user:${id}:counter`, (err, response) => {
-  //     if (err) {
-  //         console.error('Error clearing Redis cache:', err);
-  //         return res.status(500).json({ success: false, message: 'Failed to clear Redis cache.' });
-  //     }
-
-  //     // Check if at least one key was deleted
-  //     if (response > 0) {
-  //       console.log(`Cache cleared for keys: ${cacheKeys.join(', ')}`);
-  //       res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
-  //     } else {
-  //         console.log(`Cache keys not found: ${cacheKeys.join(', ')}`);
-  //         res.status(404).json({ success: false, message: 'Cache keys not found.' });
-  //     }
-  // });
 
   redisConnectionClient.del(cacheKeys);
   res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
@@ -752,6 +758,8 @@ app.post("/api/check", async (req, res) => {
 
 //   res.status(200).end();
 // });
+
+
 
 // Testing routes
 app.get("/test", (req, res) => {

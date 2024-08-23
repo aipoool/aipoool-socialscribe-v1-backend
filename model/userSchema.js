@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
     googleId:String, 
     userName:String, 
     email:String, 
-    openAIKey:String, 
     subId:String, 
     stripePriceId:String,
     stripeProductId:String,
