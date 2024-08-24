@@ -157,6 +157,10 @@ app.get("/auth/google/url", (req, res) => {
   const googleAuthURL = getGoogleAuthURL();
   return res.redirect(googleAuthURL);
 });
+/**ENCRYPTION CODE HERE*********** */
+function deriveKey(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+}
 
 // Handling the callback from Google OAuth
 app.get("/auth/google/callback", async (req, res) => {
@@ -210,19 +214,23 @@ app.get("/auth/google/callback", async (req, res) => {
 
   console.log("token generated at MongoDB ::: " , token); 
 
-    // Encrypt the token using AES
-    const algorithm = 'aes-256-cbc';
-    const key = crypto.scryptSync("kaif123", 'salt', 32); // Derive key from password
-    const iv = crypto.randomBytes(16); // Initialization vector
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-  
-    let encryptedToken = cipher.update(token, "utf8", "hex");
-    encryptedToken += cipher.final("hex");
-  
-    // Convert IV to hex and prepend it to the encrypted token (necessary for decryption)
-    const encryptedTokenWithIv = iv.toString('hex') + ':' + encryptedToken;
+  // Derive key using PBKDF2
+  const password = "kaif123";
+  const salt = "salt123"; // Ensure this salt is known on both backend and frontend
+  const key = deriveKey(password, salt);
 
-  // Redirect to the frontend
+  // Encrypt the token using AES-256-GCM
+  const iv = crypto.randomBytes(12); // 96-bit IV for AES-GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+  let encrypted = cipher.update(token, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+
+  // Concatenate IV, authTag, and encrypted token
+  const encryptedTokenWithIv = iv.toString('hex') + ':' + authTag + ':' + encrypted;
+
+  // Redirect to the frontend with the encrypted token in the query parameters
   res.redirect(`https://socialscribe-aipoool.onrender.com/redirecting?token=${encodeURIComponent(encryptedTokenWithIv)}`);
 });
 
