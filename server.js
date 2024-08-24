@@ -273,13 +273,11 @@ app.get("/auth/login/success", (req, res) => {
 
 
 app.post("/auth/userdata", verifyToken, async (req, res) => {
-  const { id, accessToken } = req.body;
+  const { id } = req.body;
   try {
-    if (accessToken) {
       const user = await userdb.findById(id);
       console.log({ results: user });
       res.status(200).json({ results: user });
-    }
   } catch (error) {
     console.error("Error retrieving user data", error);
     res.status(500).send({ message: "Error retrieving user data" });
@@ -357,12 +355,11 @@ app.post("/api/getUserRating", verifyToken, async (req, res) => {
 
 
 app.post("/api/setCounter", verifyToken, async (req, res) => {
-  const { id, count, accessToken } = req.body;
+  const { id, count } = req.body;
   const cacheKey = `user:${id}:counter`;
   console.log(req.body);
 
   try {
-    if (accessToken) {
       const updatedUser = await userdb.findOneAndUpdate(
         { _id: id },
         { $set: { buttonCounts: count } },
@@ -375,7 +372,6 @@ app.post("/api/setCounter", verifyToken, async (req, res) => {
       console.log(`Data updated in redis for key: ${cacheKey}`);
 
       res.send({ message: "Counter updated successfully" });
-    }
   } catch (error) {
     console.error("Error updating Counter:", error);
     res.status(500).send({ message: "Error updating Counter" });
@@ -385,11 +381,9 @@ app.post("/api/setCounter", verifyToken, async (req, res) => {
 // redis version to get the counter 
 // API to get counter with Redis caching
 app.post("/api/getCounter", verifyToken, async (req, res) => {
-  const { id, accessToken } = req.body;
+  const { id } = req.body;
   const cacheKey = `user:${id}:counter`;
   try {
-    if (accessToken) {
-      
       // trying to get the data from redis 
       const userCountRedis = await redisConnectionClient.get(cacheKey);
       if (userCountRedis) {
@@ -416,8 +410,6 @@ app.post("/api/getCounter", verifyToken, async (req, res) => {
           totalCount: response.totalCount,
         });
       }
-
-    }
   } catch (error) {
     console.error("Error getting Counter:", error);
     res.status(500).send({ message: "Error getting Counter" });
