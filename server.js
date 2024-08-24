@@ -207,6 +207,7 @@ app.get("/auth/google/callback", async (req, res) => {
       id: user._id,
       googleId: user.googleId,
       email: user.email,
+      isANewUser: user.isANewUser,
     },
     process.env.JWT_KEY,
     { expiresIn: "3 days" }
