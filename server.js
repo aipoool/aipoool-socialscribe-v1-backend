@@ -139,17 +139,17 @@ async function getTokens({ code, clientId, clientSecret, redirectUri }) {
     grant_type: "authorization_code",
   };
 
-  return axios
-    .post(url, querystring.stringify(values), {
+  try {
+    const response = await axios.post(url, querystring.stringify(values), {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-    })
-    .then((res) => res.data)
-    .catch((error) => {
-      console.error("Failed to fetch auth tokens", error.message);
-      throw new Error(error.message);
     });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch auth tokens", error.message);
+    throw new Error("Failed to fetch auth tokens");
+  }
 }
 
 // Getting login URL
@@ -166,74 +166,87 @@ function deriveKey(password, salt) {
 app.get("/auth/google/callback", async (req, res) => {
   const code = req.query.code ;
 
-  const { id_token, access_token } = await getTokens({
-    code,
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri: "https://socialscribe-v1-backend.onrender.com/auth/google/callback",
-  });
+  if (!code) {
+    // If no code is present, redirect to an error page or show a message
+    return res.redirect('https://socialscribe-aipoool.onrender.com/login-failed?message=No+code+provided+in+Google+callback');
+  }
 
-  // Fetch the user's profile using the access token
-  const googleUser = await axios
-    .get(
-      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
-      {
-        headers: {
-          Authorization: `Bearer ${id_token}`,
-        },
-      }
-    )
-    .then((res) => res.data)
-    .catch((error) => {
-      console.error("Failed to fetch user data");
-      throw new Error(error.message);
+  try{
+    const { id_token, access_token } = await getTokens({
+      code,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      redirectUri: "https://socialscribe-v1-backend.onrender.com/auth/google/callback",
     });
+  
+    // Fetch the user's profile using the access token
+    const googleUser = await axios
+      .get(
+        `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
+        {
+          headers: {
+            Authorization: `Bearer ${id_token}`,
+          },
+        }
+      )
+      .then((res) => res.data)
+      .catch((error) => {
+        console.error("Failed to fetch user data");
+        throw new Error(error.message);
+      });
+  
+    // Find or create a user in your database
+    let user = await userdb.findOneAndUpdate(
+      { googleId: googleUser.id },
+      {
+        googleId: googleUser.id,
+        userName: googleUser.name,
+        email: googleUser.email,
+      },
+      { new: true, upsert: true } // Create the user if not found
+    );
+  
+  
+    const token = jwt.sign(
+      {
+        id: user._id,
+        googleId: user.googleId,
+        email: user.email,
+        isANewUser: user.isANewUser,
+        userName : user.userName,
+      },
+      process.env.JWT_KEY,
+      { expiresIn: "2 days" }
+    );
+  
+    console.log("token generated at MongoDB ::: " , token); 
+  
+    // Derive key using PBKDF2
+    const password = "kaif123";
+    const salt = "salt123"; // Ensure this salt is known on both backend and frontend
+    const key = deriveKey(password, salt);
+  
+    // Encrypt the token using AES-256-GCM
+    const iv = crypto.randomBytes(12); // 96-bit IV for AES-GCM
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  
+    let encrypted = cipher.update(token, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+  
+    // Concatenate IV, authTag, and encrypted token
+    const encryptedTokenWithIv = iv.toString('hex') + ':' + authTag + ':' + encrypted;
+  
+    // Redirect to the frontend with the encrypted token in the query parameters
+    res.redirect(`https://socialscribe-aipoool.onrender.com/redirecting?token=${encodeURIComponent(encryptedTokenWithIv)}`);
 
-  // Find or create a user in your database
-  let user = await userdb.findOneAndUpdate(
-    { googleId: googleUser.id },
-    {
-      googleId: googleUser.id,
-      userName: googleUser.name,
-      email: googleUser.email,
-    },
-    { new: true, upsert: true } // Create the user if not found
-  );
+  } catch (error) {
+    console.error("Error during Google OAuth callback:", error.message);
+    // Redirect the user to an error page or show an error message
+    res.redirect(`https://socialscribe-aipoool.onrender.com/login-failed?message=${encodeURIComponent(error.message)}`);
+  }
 
-  console.log("User found/created at MongoDB ::: " , user); 
 
-  const token = jwt.sign(
-    {
-      id: user._id,
-      googleId: user.googleId,
-      email: user.email,
-      isANewUser: user.isANewUser,
-      userName : user.userName,
-    },
-    process.env.JWT_KEY,
-    { expiresIn: "3 days" }
-  );
-
-  console.log("token generated at MongoDB ::: " , token); 
-
-  // Derive key using PBKDF2
-  const password = "kaif123";
-  const salt = "salt123"; // Ensure this salt is known on both backend and frontend
-  const key = deriveKey(password, salt);
-
-  // Encrypt the token using AES-256-GCM
-  const iv = crypto.randomBytes(12); // 96-bit IV for AES-GCM
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-
-  let encrypted = cipher.update(token, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  const authTag = cipher.getAuthTag().toString('hex');
-
-  // Concatenate IV, authTag, and encrypted token
-  const encryptedTokenWithIv = iv.toString('hex') + ':' + authTag + ':' + encrypted;
-
-  // Redirect to the frontend with the encrypted token in the query parameters
-  res.redirect(`https://socialscribe-aipoool.onrender.com/redirecting?token=${encodeURIComponent(encryptedTokenWithIv)}`);
 });
 
 
@@ -287,11 +300,12 @@ app.post("/auth/userdata", verifyToken, async (req, res) => {
 
 app.post("/auth/logout", verifyToken, async (req, res, next) => {
   const { id } = req.body;
+
+  // clearing the keys from redis
   const cacheKeys = [`user:${id}:counter`, `user:${id}:rating`];
-
   console.log(`Clearing cache for keys: ${cacheKeys.join(', ')}`);
-
   redisConnectionClient.del(cacheKeys);
+
   res.status(200).json({ success: true, message: 'Redis cache cleared successfully.' });
 });
 
@@ -302,6 +316,7 @@ app.get("/api/test", (req, res) => {
 
 /**OPENAI API ROUTES */
 app.options("/api/generate-response", cors());
+
 app.post("/api/generate-response", verifyToken, async (req, res) => {
   const { post, tone,  site } = req.body;
 
@@ -439,353 +454,8 @@ app.post("/api/check", async (req, res) => {
   }
 });
 
-// app.post("/api/create-checkout-session", async (req, res) => {
-//   /** ACCEPT THE EMAIL VIA BODY TO HARDCODE IT INTO THE PAYMENT BLANK */
-//   const { data } = req.body;
-
-//   const userEmail = data.userEmail;
-//   const mongoId = data.userMongoId;
-//   const typeOfPlan = data.type;
-//   const StripeProductId = data.productId;
-//   const StripePriceId = data.priceId;
-
-//   let customer;
-//   const auth0UserId = userEmail;
-//   console.log("Data Here :::: ", data);
-//   console.log(`${data.plan} ::::: ${data.price} :::::: ${mongoId}`);
-
-//   /** CHECK IF THE CUSTOMER IS PRESENT IN THE STRIPE CUSTOMER'S LIST */
-//   const existingCustomers = await stripe.customers.list({
-//     email: userEmail,
-//     limit: 1,
-//   });
-
-//   /** CHECK IF THERE IS SOME ACTIVE SUBSCRIPTION ALREADY */
-//   if (existingCustomers.data.length > 0) {
-//     // Customer already exists
-//     customer = existingCustomers.data[0];
-
-//     // Check if the customer already has an active subscription
-//     const subscriptions = await stripe.subscriptions.list({
-//       customer: customer.id,
-//       status: "active",
-//       limit: 1,
-//     });
-
-//     if (subscriptions.data.length > 0) {
-//       // Customer already has an active subscription, send them to biiling portal to manage subscription
-
-//       const stripeSession = await stripe.billingPortal.sessions.create({
-//         customer: customer.id,
-//         return_url: "https://socialscribe-aipoool.onrender.com/success",
-//       });
-//       //return res.status(409).json({ redirectUrl: stripeSession.url });
-
-//       return res.json({ redirectUrl: stripeSession.url });
-//     }
-//   } else {
-//     // No customer found, create a new one
-//     customer = await stripe.customers.create({
-//       email: userEmail,
-//       metadata: {
-//         userId: auth0UserId, // Replace with actual Auth0 user ID
-//         mongoId: mongoId,
-//         priceId: StripePriceId,
-//         productId: StripeProductId,
-//         type: typeOfPlan,
-//       },
-//     });
-//   }
-
-//   console.log(`Customer::::::`);
-//   console.log(customer);
-
-//   console.log("Customer ID ::: ", customer.id);
-
-//   // const lineItems = [
-//   //   {
-//   //     price_data: {
-//   //       currency: "inr",
-//   //       product_data: {
-//   //         name: data.plan,
-//   //         description: `This is the ${data.plan} version.`,
-//   //       },
-//   //       unit_amount: data.price * 100,
-//   //       recurring: {
-//   //         interval: "month",
-//   //       },
-//   //     },
-//   //     quantity: 1,
-//   //   },
-//   // ];
-
-//   const lineItems = [
-//     {
-//       price: StripePriceId,
-//       quantity: 1,
-//     },
-//   ];
-
-//   const session = await stripe.checkout.sessions.create({
-//     payment_method_types: ["card"],
-//     line_items: lineItems,
-//     billing_address_collection: "auto",
-//     mode: "subscription",
-//     success_url: "https://socialscribe-aipoool.onrender.com/success",
-//     cancel_url: "https://socialscribe-aipoool.onrender.com/cancel",
-//     metadata: {
-//       userId: auth0UserId,
-//       mongoId: mongoId,
-//       priceId: StripePriceId,
-//       productId: StripeProductId,
-//       type: typeOfPlan,
-//     },
-//     customer: customer.id,
-//   });
-
-//   console.log("Session ID Here ::: ", session.id);
-
-//   res.json({ id: session.id });
-// });
-
-// // webhook for subscription
-// app.post("/stripe-webhook", async (req, res) => {
-//   let event = req.body;
-
-//   if (endptSecret) {
-//     // Get the signature sent by Stripe
-//     const signature = req.headers["stripe-signature"];
-//     try {
-//       event = stripe.webhooks.constructEvent(req.body, signature, endptSecret);
-//       console.log("Event Type ::: ", event.type);
-//     } catch (err) {
-//       console.log(`⚠️  Webhook signature verification failed.`, err.message);
-//       return res.sendStatus(400);
-//     }
-//   }
-
-//   if (event.type === "invoice.payment_succeeded") {
-//     const invoice = event.data.object;
-
-//     // On payment successful, get subscription and customer details
-//     const subscription = await stripe.subscriptions.retrieve(
-//       event.data.object.subscription
-//     );
-//     const customer = await stripe.customers.retrieve(
-//       event.data.object.customer
-//     );
-
-//     console.log(
-//       `Subscription from the PAYMENT SUCCEEDED :::::: `,
-//       subscription
-//     );
-
-//     if (invoice.billing_reason === "subscription_create") {
-//       // Getting the mongoId from the metadata -
-
-//       const mongoId = customer?.metadata?.mongoId;
-//       const typeOfPlan = customer?.metadata?.type;
-//       const priceId = customer?.metadata?.priceId;
-//       const productId = customer?.metadata?.productId;
-
-//       // calling the database and getting the totalcounts
-
-//       let infoDB = await userdb.findById(mongoId);
-//       let dbTotalCount = infoDB.totalCount;
-//       console.log(dbTotalCount);
-//       let updatePlanCount;
-//       if (typeOfPlan === "premium") {
-//         updatePlanCount = dbTotalCount + 10;
-//       } else {
-//         updatePlanCount = dbTotalCount + 30;
-//       }
-//       const result = await userdb.findOneAndUpdate(
-//         { _id: mongoId },
-//         {
-//           $set: {
-//             subId: event.data.object.subscription,
-//             endDate: subscription.current_period_end * 1000,
-//             totalCount: updatePlanCount,
-//             subType: typeOfPlan,
-//             stripePriceId: priceId,
-//             stripeProductId: productId,
-//           },
-//         },
-//         { new: true, useFindAndModify: false }
-//       );
-
-//       console.log(`A document was inserted with the invoice ID: ${invoice.id}`);
-//       console.log(
-//         `First subscription payment successful for Invoice ID: ${customer.email} ${customer?.metadata?.userId}`
-//       );
-//     } else if (
-//       invoice.billing_reason === "subscription_cycle" ||
-//       invoice.billing_reason === "subscription_update"
-//     ) {
-//       // Handle recurring subscription payments
-//       console.log(
-//         `Subscription from the RECURRING PAYMENT :::::: `,
-//         subscription
-//       );
-//       console.log(`CHANGED PLAN HERE  :::::: `, subscription.plan);
-
-//       const mongoId = customer?.metadata?.mongoId;
-//       let updatePlanCount, typeOfPlan;
-//       const priceId = subscription?.plan?.id;
-//       const productId = subscription?.plan?.product;
-//       // calling the database and getting the totalcounts
-//       let infoDB = await userdb.findById(mongoId);
-//       let dbTotalCount = infoDB.totalCount;
-
-//       if (priceId === "price_1PKzSsSGYG2CnOjsDpM6cUau") {
-//         updatePlanCount = dbTotalCount + 10;
-//         typeOfPlan = "premium";
-//       } else {
-//         updatePlanCount = dbTotalCount + 30;
-//         typeOfPlan = "pro";
-//       }
-//       const result = await userdb.findOneAndUpdate(
-//         { _id: mongoId },
-//         {
-//           $set: {
-//             endDate: subscription.current_period_end * 1000,
-//             recurringSuccessful_test: true,
-//             totalCount: updatePlanCount,
-//             subType: typeOfPlan,
-//             stripePriceId: priceId,
-//             stripeProductId: productId,
-//           },
-//         },
-//         { new: true, useFindAndModify: false }
-//       );
-
-//       if (result.matchedCount === 0) {
-//         console.log("No documents matched the query. Document not updated");
-//       } else if (result.modifiedCount === 0) {
-//         console.log(
-//           "Document matched but not updated (it may have the same data)"
-//         );
-//       } else {
-//         console.log(`Successfully updated the document`);
-//       }
-
-//       console.log(
-//         `Recurring subscription payment successful for Invoice ID: ${invoice.id}`
-//       );
-//     }
-
-//     console.log(
-//       new Date(subscription.current_period_end * 1000),
-//       subscription.status,
-//       invoice.billing_reason
-//     );
-//   }
-
-//   // For canceled/renewed subscription
-//   if (event.type === "customer.subscription.updated") {
-//     const subscription = event.data.object;
-
-//     const customer = await stripe.customers.retrieve(
-//       event.data.object.customer
-//     );
-//     console.log(subscription); 
-//     console.log(subscription.cancel_at_period_end);
-
-//     // console.log(event);
-//     if (subscription.cancel_at_period_end) {
-//       console.log(`Subscription ${subscription.id} was canceled.`);
-//       const mongoId = customer?.metadata?.mongoId;
-
-//       // await stripe.subscriptions.update(subscription.id, {
-//       //   cancel_at_period_end: true,
-//       // });
-
-//       const result = await userdb.findOneAndUpdate(
-//         {
-//           _id: mongoId,
-//         },
-//         {
-//           $unset: {
-//             endDate: "",
-//             subId: "",
-//             recurringSuccessful_test: false,
-//             stripePriceId: "",
-//             stripeProductId: "",
-//           },
-//           $set: {
-//             subType: "free",
-//             hasCancelledSubscription: true,
-//           },
-//         }
-//       );
-
-//       console.log("Customer from CANCEL SUBSCRIPTION :::: ", customer); // we're getting the data
-//       console.log("Subscription after CANCEL SUBSCRIPTION :::: ", subscription); // we're getting
-      
-//     } else {
-//       ///calling the database and getting the totalcounts
-//       const mongoId = customer?.metadata?.mongoId;
-//       let infoDB = await userdb.findById(mongoId);
-//       let dbTotalCount = infoDB.totalCount;
-//       let hasCancelledSubscription = infoDB.hasCancelledSubscription;
-//       console.log("Has cancelled plan ::: " , hasCancelledSubscription); 
-
-//       if (hasCancelledSubscription) {
-//         const subscriptionsUpdated = await stripe.subscriptions.list({
-//           customer: customer.id,
-//         });
-
-//         console.log(
-//           "Subscription plan ::: ",
-//           subscriptionsUpdated.data[0].plan
-//         );
-//         console.log(customer?.metadata);
-
-//         const priceId = subscriptionsUpdated.data[0].plan?.id;
-//         const productId = subscriptionsUpdated.data[0].plan?.product;
-
-//         console.log(`Original details ::::: ${customer?.metadata.priceId} --> 
-//         ${customer?.metadata.productId} --> ${customer?.metadata.type}`);
-
-//         console.log("Customer from RESTARTED SUBSCRIPTION :::: ", customer); // we're getting the data
-
-//         let updatePlanCount, typeOfPlan;
-//         if (priceId === "price_1PKzSsSGYG2CnOjsDpM6cUau") {
-//           updatePlanCount = dbTotalCount + 10;
-//           typeOfPlan = "premium";
-//         } else {
-//           updatePlanCount = dbTotalCount + 30;
-//           typeOfPlan = "pro";
-//         }
-
-//         console.log(`Changed to details ::::: ${priceId} -->
-//       ${productId} --> ${typeOfPlan}`);
-
-//         const result = await userdb.findOneAndUpdate(
-//           { _id: mongoId },
-//           {
-//             $set: {
-//               endDate: subscription.current_period_end * 1000, // need to check this!!!
-//               recurringSuccessful_test: true,
-//               totalCount: updatePlanCount,
-//               subType: typeOfPlan,
-//               stripePriceId: priceId,
-//               stripeProductId: productId,
-//               hasCancelledSubscription: false,
-//             },
-//           },
-//           { new: true, useFindAndModify: false }
-//         );
-//       }
-//     }
-//   }
-
-//   res.status(200).end();
-// });
 
 
-
-// Testing routes
 app.get("/test", (req, res) => {
   res.json({ Hi: "This is a... testing message" });
 });
