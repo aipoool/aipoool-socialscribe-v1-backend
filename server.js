@@ -128,7 +128,7 @@ function getGoogleAuthURL() {
   return `${rootUrl}?${querystring.stringify(options)}`;
 }
 
-// Helper function to exchange code for tokens
+// Helper function to exchange code for jwt tokens
 async function getTokens({ code, clientId, clientSecret, redirectUri }) {
   const url = "https://oauth2.googleapis.com/token";
   const values = {
