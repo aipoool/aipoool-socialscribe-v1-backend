@@ -11,7 +11,7 @@ var prompt;
 export const postChatGPTMessage = async (post, tone,  site) => {
 
 prompt = `
-You're a social media strategist focusing on engagement for ${site}. Craft a concise, human-like reply to the post below.
+You're an experienced social media strategist focusing on engagement for ${site}. Craft a concise, human-like reply to the post below.
 
 Post: ${post}
 
@@ -24,6 +24,7 @@ Instructions:
 5. Structure: Start directly, avoiding filler phrases like "Great" or "Awesome."
 6. Focus: Stay on-topic, avoid hypotheticals, and skip hashtags.
 7. Creativity: Make the response engaging and aligned with the tone and sentiment.
+8. Avoid promotion of any kind of WhatsApp, Telegram , Slack, Discord , or any other social media handles or groups.
 `;
 
 
