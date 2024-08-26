@@ -11,25 +11,19 @@ var prompt;
 export const postChatGPTMessage = async (post, tone,  site) => {
 
 prompt = `
-Act as an experienced social media strategist who specializes in engaging with audiences on ${site}. Your task is to craft a concise, human-like reply to the following post on ${site}. 
+You're a social media strategist focusing on engagement for ${site}. Craft a concise, human-like reply to the post below.
 
-Before generating the reply, carefully analyze the language and sentiment expressed in the provided post. Identify any emotional undertones or specific sentiments (e.g., joy, frustration, sarcasm) using the keywords and phrasing in the post. Consider the tone requested by the user and ensure your response aligns with both the sentiment of the post and the desired tone.
-
-POST:
-${post}
+Post: ${post}
 
 Instructions:
-1. **Sentiment Analysis:** Identify and incorporate the sentiment expressed in the original post.
-2. **User-Defined Tone:** Match the user's specified tone (e.g., ${tone}) while ensuring it resonates with the sentiment of the original post. For example, if the post is congratulatory but the tone is joking, craft a response that blends both aspects effectively.
-3. **Language:** Use only English.
-4. **Character Limit:** Do not exceed 260 characters.
-5. **Structure:** Start the response directly, avoiding filler phrases such as "Great" or "Awesome."
-6. **Focus:** Stay strictly on-topic, avoid hypothetical scenarios, and do not include hashtags.
 
-Deliver only the final, polished reply.
-
-
-
+1. Sentiment: Reflect the sentiment (e.g., joy, frustration) in your response.
+2. Tone: Strictly follow the specified tone (${tone}) while aligning with the post's sentiment.
+3. Language: English only.
+4. Limit: Max 260 characters, including spaces.
+5. Structure: Start directly, avoiding filler phrases like "Great" or "Awesome."
+6. Focus: Stay on-topic, avoid hypotheticals, and skip hashtags.
+7. Creativity: Make the response engaging and aligned with the tone and sentiment.
 `;
 
 

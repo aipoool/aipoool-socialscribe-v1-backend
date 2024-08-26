@@ -6,9 +6,6 @@ const userSchema = new mongoose.Schema({
     googleId:String, 
     userName:String, 
     email:String, 
-    subId:String, 
-    stripePriceId:String,
-    stripeProductId:String,
     endDate:Number, 
     isANewUser: {
         type:Boolean, 
@@ -18,25 +15,13 @@ const userSchema = new mongoose.Schema({
         type:Number, 
         default:1
     },
-    subType: {
-        type:String, 
-        default: 'free',
-    },
-    recurringSuccessful_test: {
-        type:Boolean, 
-        default:false
-    }, 
-    hasCancelledSubscription: {
-        type:Boolean, 
-        default:false
-    },
     buttonCounts: {
         type: Number,
         default: 0
     },
     totalCount: {
         type: Number,
-        default: 10
+        default: 60
     }
 },{timestamps:true});
 
